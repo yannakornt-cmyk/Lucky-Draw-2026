@@ -153,7 +153,7 @@
         }
 
         async function handleRegister() {
-            // Confirm Dialog ตามความต้องการ (SweetAlert)
+            // Confirm Dialog ตามความต้องการ
             const result = await Swal.fire({
                 title: 'ยืนยันการลงทะเบียน?',
                 text: `คุณ ${userProfile.displayName} ต้องการเข้าร่วมกิจกรรมใช่หรือไม่?`,
@@ -167,7 +167,7 @@
                 confirmButtonText: 'ใช่, ลงทะเบียนเลย!',
                 cancelButtonText: 'ยกเลิก',
                 customClass: {
-                    image: 'rounded-full border-4 border-gray-200' // รูปวงกลมตาม Request
+                    image: 'rounded-full border-4 border-gray-200'
                 }
             });
 
@@ -186,17 +186,22 @@
                     const resData = await response.json();
                     
                     if(resData.status === 'success') {
+                        // แสดง Alert สำเร็จก่อน
                         await Swal.fire('สำเร็จ!', 'ลงทะเบียนเรียบร้อยแล้ว', 'success');
-                        checkUserStatus(); // Refresh UI
+                        
+                        // 🟢 แก้ไขตรงนี้: สั่งให้โหลดหน้าจอใหม่
+                        window.location.reload(); 
                     } else {
                         Swal.fire('แจ้งเตือน', resData.message, 'warning');
+                        showLoading(false); // ถ้าไม่สำเร็จ ให้ปิด loading เพื่อให้กดใหม่ได้
                     }
 
                 } catch (err) {
+                    console.error(err);
                     Swal.fire('Error', 'เกิดข้อผิดพลาดในการส่งข้อมูล', 'error');
-                } finally {
                     showLoading(false);
                 }
+                // ตัด finally ออกเพื่อให้ loading ค้างไว้จนกว่าหน้าจะ refresh (กรณีสำเร็จ)
             }
         }
 
