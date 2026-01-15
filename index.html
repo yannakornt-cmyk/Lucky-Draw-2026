@@ -3,247 +3,270 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gift Exchange 2026</title>
+    <title>Lucky Draw: Gift Exchange</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
     
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+
     <style>
         body { font-family: 'Prompt', sans-serif; }
-        .bg-festive {
-            background-color: #d32f2f; /* Red */
-            background-image: radial-gradient(#ef5350 1px, transparent 1px);
-            background-size: 20px 20px;
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+        }
+        .loader {
+            border-top-color: #3498db;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
-<body class="bg-festive min-h-screen flex items-center justify-center p-4">
+<body class="bg-gradient-to-br from-red-500 to-red-800 min-h-screen flex items-center justify-center p-4">
 
-    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border-4 border-yellow-400 relative">
+    <div class="glass-panel w-full max-w-md rounded-2xl shadow-2xl p-6 text-center space-y-6">
         
-        <div class="bg-green-700 p-6 text-center text-white">
-            <h1 class="text-3xl font-bold">🎁 จับฉลากของขวัญ</h1>
-            <p class="text-green-100 text-sm mt-1">Gift Exchange Party</p>
+        <div>
+            <h1 class="text-3xl font-bold text-red-700">🎁 Gift Exchange</h1>
+            <p class="text-gray-600 text-sm mt-1">จับฉลากของขวัญปีใหม่</p>
         </div>
 
-        <div id="app" class="p-6 min-h-[300px] flex flex-col items-center justify-center">
-            <div id="loading" class="text-center">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mx-auto"></div>
-                <p class="mt-4 text-gray-600">กำลังโหลดข้อมูล...</p>
+        <div id="loading" class="flex flex-col items-center py-10">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div>
+            <p class="text-gray-500 animate-pulse">กำลังโหลดข้อมูล...</p>
+        </div>
+
+        <div id="main-content" class="hidden space-y-6">
+            
+            <div class="flex flex-col items-center">
+                <img id="user-img" src="" alt="Profile" class="w-24 h-24 rounded-full border-4 border-white shadow-lg object-cover">
+                <h2 id="user-name" class="text-xl font-semibold text-gray-800 mt-3"></h2>
+                <span id="user-status" class="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-600 mt-1">Guest</span>
             </div>
+
+            <div id="action-area" class="pt-4">
+                </div>
+
         </div>
 
-        <div class="bg-gray-50 p-3 text-center text-xs text-gray-400">
-            Powered by GAS & LINE LIFF
+        <div class="text-xs text-gray-400 mt-8">
+            Created for Gift Exchange Event
         </div>
     </div>
 
     <script>
         // --- CONFIGURATION ---
-        const LIFF_ID = "2008897166-JAm3SznE"; 
-        const API_URL = "https://script.google.com/a/macros/chula.ac.th/s/AKfycbyQ-hdDQAVHjP_s-_ZTbBqNJAziSXsXKUBApMjOhy2YnJfL02Juvd50R47olUuL7j93dA/exec"; // Ends in /exec
+        const LIFF_ID = "2008897166-JAm3SznE"; // ใส่ LIFF ID ของคุณ
+        const GAS_ENDPOINT = "https://script.google.com/a/macros/chula.ac.th/s/AKfycbyQ-hdDQAVHjP_s-_ZTbBqNJAziSXsXKUBApMjOhy2YnJfL02Juvd50R47olUuL7j93dA/exec"; // ใส่ URL Web App ที่ได้จาก Deploy
 
-        let userProfile = null;
+        // Global User Data
+        let userProfile = {};
 
-        // --- MAIN LOGIC ---
         async function main() {
             try {
                 await liff.init({ liffId: LIFF_ID });
+                
                 if (!liff.isLoggedIn()) {
                     liff.login();
                     return;
                 }
-                
-                userProfile = await liff.getProfile();
-                checkUserStatus();
 
-            } catch (err) {
-                Swal.fire('Error', 'Failed to initialize LIFF: ' + err.message, 'error');
+                const profile = await liff.getProfile();
+                userProfile = {
+                    userId: profile.userId,
+                    displayName: profile.displayName,
+                    pictureUrl: profile.pictureUrl
+                };
+
+                // Setup UI with Profile
+                document.getElementById('user-img').src = userProfile.pictureUrl;
+                document.getElementById('user-name').innerText = userProfile.displayName;
+                
+                // Check Registration Status
+                await checkUserStatus();
+
+            } catch (error) {
+                console.error('LIFF Init Error', error);
+                Swal.fire('Error', 'ไม่สามารถเชื่อมต่อกับ LINE ได้', 'error');
             }
         }
 
-        // --- API & ACTIONS ---
-
-        // 1. Check Status
         async function checkUserStatus() {
             showLoading(true);
             try {
-                const response = await callApi('checkUser', { userId: userProfile.userId });
-                showLoading(false);
+                const response = await fetch(GAS_ENDPOINT, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'check_register',
+                        user_id: userProfile.userId
+                    })
+                });
+                const data = await response.json();
                 
-                if (response.state === 'not_registered') {
-                    renderRegister();
-                } else if (response.state === 'registered_not_drawn') {
-                    renderDraw();
-                } else if (response.state === 'completed') {
-                    renderResult(response.result);
-                }
+                renderInterface(data);
 
-            } catch (err) {
+            } catch (error) {
+                console.error(error);
+                Swal.fire('Connection Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+            } finally {
                 showLoading(false);
-                Swal.fire('Error', 'Connection failed', 'error');
             }
         }
 
-        // 2. Register
-        async function handleRegister() {
-            const giftDesc = document.getElementById('giftInput').value;
-            if (!giftDesc) {
-                Swal.fire('แจ้งเตือน', 'กรุณาระบุของขวัญของคุณ', 'warning');
-                return;
-            }
+        function renderInterface(data) {
+            const actionArea = document.getElementById('action-area');
+            const statusBadge = document.getElementById('user-status');
+            actionArea.innerHTML = ''; // Clear existing
 
-            // Confirm before submit
-            const confirm = await Swal.fire({
-                title: 'ยืนยันการลงทะเบียน',
-                text: `ของขวัญคือ: ${giftDesc}`,
-                icon: 'question',
+            if (!data.is_registered) {
+                // CASE 1: ยังไม่ลงทะเบียน
+                statusBadge.className = "text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 mt-1";
+                statusBadge.innerText = "ยังไม่ลงทะเบียน";
+                
+                const btn = document.createElement('button');
+                btn.className = "w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transform transition hover:scale-105";
+                btn.innerHTML = "📝 ลงทะเบียนร่วมกิจกรรม";
+                btn.onclick = handleRegister;
+                actionArea.appendChild(btn);
+
+            } else {
+                // CASE 2: ลงทะเบียนแล้ว -> เช็คว่าจับฉลากไปหรือยัง (ต้องเช็คเพิ่ม หรือดูจาก Logic ฝั่ง Server)
+                // เพื่อความง่าย ในที่นี้เราจะแสดงปุ่มจับฉลากเสมอ แต่ Server จะกันให้ถ้าจับไปแล้ว
+                
+                statusBadge.className = "text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 mt-1";
+                statusBadge.innerText = "ลงทะเบียนแล้ว";
+
+                const btn = document.createElement('button');
+                btn.className = "w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg text-lg transform transition hover:scale-105 flex items-center justify-center gap-2";
+                btn.innerHTML = "🎲 จับฉลากเลย!";
+                btn.onclick = handleDraw;
+                actionArea.appendChild(btn);
+            }
+        }
+
+        async function handleRegister() {
+            // Confirm Dialog ตามความต้องการ (SweetAlert)
+            const result = await Swal.fire({
+                title: 'ยืนยันการลงทะเบียน?',
+                text: `คุณ ${userProfile.displayName} ต้องการเข้าร่วมกิจกรรมใช่หรือไม่?`,
+                imageUrl: userProfile.pictureUrl,
+                imageWidth: 100,
+                imageHeight: 100,
+                imageAlt: 'Custom image',
                 showCancelButton: true,
-                confirmButtonText: 'ยืนยัน',
-                cancelButtonText: 'แก้ไข'
+                confirmButtonColor: '#10B981', // Green
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'ใช่, ลงทะเบียนเลย!',
+                cancelButtonText: 'ยกเลิก',
+                customClass: {
+                    image: 'rounded-full border-4 border-gray-200' // รูปวงกลมตาม Request
+                }
             });
 
-            if (confirm.isConfirmed) {
-                Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-                
-                const res = await callApi('register', {
-                    userId: userProfile.userId,
-                    displayName: userProfile.displayName,
-                    giftDetails: giftDesc
-                });
+            if (result.isConfirmed) {
+                showLoading(true);
+                try {
+                    const response = await fetch(GAS_ENDPOINT, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'register',
+                            user_id: userProfile.userId,
+                            display_name: userProfile.displayName,
+                            picture_url: userProfile.pictureUrl
+                        })
+                    });
+                    const resData = await response.json();
+                    
+                    if(resData.status === 'success') {
+                        await Swal.fire('สำเร็จ!', 'ลงทะเบียนเรียบร้อยแล้ว', 'success');
+                        checkUserStatus(); // Refresh UI
+                    } else {
+                        Swal.fire('แจ้งเตือน', resData.message, 'warning');
+                    }
 
-                if (res.status === 'success') {
-                    await Swal.fire('สำเร็จ', 'ลงทะเบียนเรียบร้อย!', 'success');
-                    renderDraw(); // Move to next state
-                } else {
-                    Swal.fire('เกิดข้อผิดพลาด', res.message, 'error');
+                } catch (err) {
+                    Swal.fire('Error', 'เกิดข้อผิดพลาดในการส่งข้อมูล', 'error');
+                } finally {
+                    showLoading(false);
                 }
             }
         }
 
-        // 3. Draw Gift
         async function handleDraw() {
-            const confirm = await Swal.fire({
+            // Draw Confirmation
+            const confirmDraw = await Swal.fire({
                 title: 'พร้อมไหม?',
-                text: "คุณสามารถจับได้เพียงครั้งเดียวเท่านั้น!",
-                icon: 'warning',
+                text: "กดปุ่มยืนยันเพื่อสุ่มจับของขวัญ",
+                icon: 'question',
                 showCancelButton: true,
-                confirmButtonColor: '#d33',
-                confirmButtonText: 'จับฉลากเลย!',
+                confirmButtonColor: '#DC2626', // Red
+                confirmButtonText: 'จับฉลาก!',
                 cancelButtonText: 'เดี๋ยวก่อน'
             });
 
-            if (confirm.isConfirmed) {
-                // Show fancy animation or loading
-                Swal.fire({
-                    title: 'กำลังสุ่มของขวัญ...',
-                    html: 'ขอให้โชคดี! 🎁',
-                    timerProgressBar: true,
-                    didOpen: () => Swal.showLoading()
-                });
-
-                const res = await callApi('drawGift', {
-                    userId: userProfile.userId,
-                    displayName: userProfile.displayName
-                });
-
-                if (res.status === 'success') {
-                    await Swal.fire({
-                        title: 'ยินดีด้วย!',
-                        text: `คุณได้รับของขวัญจาก ${res.result.receiverName}`,
-                        icon: 'success',
-                        backdrop: `rgba(0,0,123,0.4) url("https://media.giphy.com/media/26tOZ42MgWX5Im5Ww/giphy.gif") left top no-repeat`
+            if (confirmDraw.isConfirmed) {
+                showLoading(true);
+                try {
+                    const response = await fetch(GAS_ENDPOINT, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'draw',
+                            drawer_id: userProfile.userId,
+                            drawer_name: userProfile.displayName
+                        })
                     });
-                    renderResult(res.result);
-                } else {
-                    Swal.fire('Oops...', res.message, 'error');
+                    const resData = await response.json();
+
+                    if(resData.status === 'success') {
+                        // Success Animation & Result
+                        Swal.fire({
+                            title: '🎉 ยินดีด้วย! 🎉',
+                            html: `คุณได้รับของขวัญจาก:<br/><br/>
+                                   <b style="font-size: 1.5em; color: #DC2626;">${resData.data.gift_owner_name}</b>`,
+                            icon: 'success',
+                            confirmButtonText: 'ตกลง',
+                            backdrop: `
+                                rgba(0,0,123,0.4)
+                                url("https://media.giphy.com/media/uWDwD6y7lYg6z6J5X7/giphy.gif")
+                                left top
+                                no-repeat
+                            `
+                        });
+                        // อาจจะซ่อนปุ่ม Draw หลังจับเสร็จ
+                        document.getElementById('action-area').innerHTML = `<div class="p-4 bg-gray-100 rounded-lg text-gray-600">คุณจับได้ของขวัญจาก <b>${resData.data.gift_owner_name}</b> แล้ว</div>`;
+                    } else {
+                        Swal.fire('ขออภัย', resData.message, 'error');
+                    }
+
+                } catch (err) {
+                    Swal.fire('Error', 'เกิดข้อผิดพลาดในการจับฉลาก', 'error');
+                } finally {
+                    showLoading(false);
                 }
             }
         }
 
-        // --- HELPER: API CALLER ---
-        async function callApi(action, payload) {
-            const body = { action, ...payload };
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors', // Crucial for external hosting
-                body: JSON.stringify(body)
-            });
-            return await response.json();
-        }
-
-        // --- RENDER FUNCTIONS ---
-
-        function renderRegister() {
-            const html = `
-                <div class="w-full animate-fade-in text-center">
-                    <img src="${userProfile.pictureUrl}" class="w-20 h-20 rounded-full mx-auto border-4 border-yellow-400 shadow-md mb-4">
-                    <h2 class="text-xl font-bold text-gray-800">สวัสดี, ${userProfile.displayName}</h2>
-                    <p class="text-gray-500 mb-6">ลงทะเบียนเพื่อร่วมสนุกจับฉลาก</p>
-                    
-                    <div class="mb-4 text-left">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">ของขวัญที่คุณนำมาคือ?</label>
-                        <input id="giftInput" type="text" placeholder="เช่น บัตร Starbucks 500 บาท" 
-                            class="shadow appearance-none border rounded w-full py-3 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-green-500">
-                    </div>
-
-                    <button onclick="handleRegister()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition transform hover:scale-105">
-                        ลงทะเบียนเข้าร่วม
-                    </button>
-                </div>
-            `;
-            document.getElementById('app').innerHTML = html;
-        }
-
-        function renderDraw() {
-            const html = `
-                <div class="w-full animate-fade-in text-center">
-                    <div class="text-6xl mb-4">🎁</div>
-                    <h2 class="text-2xl font-bold text-gray-800 mb-2">ถึงตาคุณแล้ว!</h2>
-                    <p class="text-gray-600 mb-8">กดปุ่มด้านล่างเพื่อสุ่มจับของขวัญ</p>
-                    
-                    <button onclick="handleDraw()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-4 rounded-xl shadow-lg transition transform hover:scale-105 text-lg">
-                        🎲 เริ่มจับฉลาก
-                    </button>
-                </div>
-            `;
-            document.getElementById('app').innerHTML = html;
-        }
-
-        function renderResult(data) {
-            const html = `
-                <div class="w-full animate-fade-in text-center p-4 border-2 border-dashed border-yellow-500 rounded-xl bg-yellow-50">
-                    <h3 class="text-gray-500 font-bold uppercase tracking-wide text-sm mb-2">ยินดีด้วย! คุณได้รับ</h3>
-                    
-                    <div class="text-3xl font-bold text-red-600 mb-1">
-                        "${data.giftDetails}"
-                    </div>
-                    
-                    <div class="my-4 border-b border-gray-300 w-1/2 mx-auto"></div>
-                    
-                    <p class="text-gray-600 text-sm">จากคุณ</p>
-                    <div class="text-xl font-bold text-green-700">
-                        ${data.receiverName}
-                    </div>
-                </div>
-                <div class="mt-6 text-center text-gray-400 text-sm">
-                    บันทึกภาพหน้าจอไว้เป็นหลักฐานนะ!
-                </div>
-            `;
-            document.getElementById('app').innerHTML = html;
-        }
-
         function showLoading(isLoading) {
-            const el = document.getElementById('loading');
-            el.style.display = isLoading ? 'block' : 'none';
+            const loader = document.getElementById('loading');
+            const content = document.getElementById('main-content');
+            if (isLoading) {
+                loader.classList.remove('hidden');
+                content.classList.add('hidden');
+            } else {
+                loader.classList.add('hidden');
+                content.classList.remove('hidden');
+            }
         }
 
-        // Start
+        // Start App
         main();
 
     </script>
